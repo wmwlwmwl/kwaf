@@ -2,6 +2,7 @@
 #define KCHALLENGE_H
 #include "KChallengeBuffer.h"
 #include "KHttpBufferParser.h"
+#include "KTargetRate.h"
 #define CC_BUFFER_STRING    0
 #define CC_BUFFER_URL       1
 #define CC_BUFFER_MURL      2
@@ -122,6 +123,7 @@ private:
 			delete body;
 			body = tmp;
 		}
+		last = NULL;
 	}
 	KChallengeBuffer *body;
 	KChallengeBuffer *last;
@@ -182,6 +184,7 @@ public:
 		rate = 0;
 		wl = false;
 		fix_url = false;
+		status_code = 200;
 		ref = 1;
 	}
 	void Release()
@@ -193,6 +196,17 @@ public:
 	void AddRef()
 	{
 		katom_inc((void *)&ref);
+	}
+	bool shouldChallenge(const char *target)
+	{
+		if (request <= 0 || second <= 0 || target == NULL) {
+			return false;
+		}
+		time_t now = time(NULL);
+		target_rate.flush(now, second);
+		int max_request = request;
+		int elapsed = 0;
+		return target_rate.getRate(target, max_request, elapsed, true) && elapsed < second;
 	}
 	void parse(const char *msg)
 	{
@@ -243,6 +257,7 @@ public:
 	float rate;
 private:
 	volatile int32_t ref;
+	KTargetRate target_rate;
 	void destroy()
 	{
 		while (body) {

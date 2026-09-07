@@ -12,7 +12,7 @@ class KWafConfig {
 public:
 	KWafConfig()
 	{
-		
+		memset(this, 0, sizeof(*this));
 	}
 	char cc_salt[16];
 	int cc_salt_len;
@@ -45,4 +45,3 @@ public:
 };
 extern KWafConfig waf_config;
 #endif
-

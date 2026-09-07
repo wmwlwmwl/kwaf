@@ -18,7 +18,9 @@ int get_challenge_session_count()
 }
 static int anticc_session_key_cmp(const void *key1, const void *key2)
 {
-	return *(int *)key1 - *(int *)key2;
+	int left = *(const int *)key1;
+	int right = *(const int *)key2;
+	return left < right ? -1 : (left > right ? 1 : 0);
 }
 void init_anticc_session()
 {

@@ -17,6 +17,7 @@ public:
 private:
 	std::string msg;
 	KChallenge *challenge;
+	KFIBER_MUTEX challenge_lock;
 };
 extern kgl_dso_version *server_support;
 #endif

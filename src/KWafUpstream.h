@@ -14,5 +14,5 @@ private:
 	KChallenge *challenge;
 };
 
-void create_waf_upstream(KREQUEST r, kgl_access_context *ctx, KChallenge *c);
+bool create_waf_upstream(KREQUEST r, kgl_access_context *ctx, KChallenge *c);
 #endif

@@ -8,13 +8,19 @@
 
 KWaf::KWaf() {
 	challenge = NULL;
+	challenge_lock = server_support->mutex->init(1);
 }
 
 
 KWaf::~KWaf() {
-	if (challenge) {
-		challenge->Release();
+	server_support->mutex->lock(challenge_lock);
+	KChallenge *old_challenge = challenge;
+	challenge = NULL;
+	server_support->mutex->unlock(challenge_lock);
+	if (old_challenge) {
+		old_challenge->Release();
 	}
+	server_support->mutex->destroy(challenge_lock);
 }
 KGL_RESULT KWaf::build(kgl_access_build* build_ctx, uint32_t build_type) {
 	std::stringstream s;
@@ -100,22 +106,37 @@ KGL_RESULT KWaf::parse(kgl_access_parse_config* parse_ctx) {
 	KChallenge* challenge = new KChallenge;
 	memcpy(static_cast<KChallengeConfig*>(challenge), static_cast<KChallengeConfig*>(this), sizeof(KChallengeConfig));
 	challenge->parse(msg.c_str());
-	if (this->challenge) {
-		this->challenge->Release();
-	}
+	server_support->mutex->lock(challenge_lock);
+	KChallenge *old_challenge = this->challenge;
 	this->challenge = challenge;
+	server_support->mutex->unlock(challenge_lock);
+	if (old_challenge) {
+		old_challenge->Release();
+	}
 	return KGL_OK;
 }
 uint32_t KWaf::process(KREQUEST r, kgl_access_context* ctx, DWORD notify) {
+	KChallenge *current = NULL;
+	server_support->mutex->lock(challenge_lock);
 	if (challenge) {
+		challenge->AddRef();
+		current = challenge;
+	}
+	server_support->mutex->unlock(challenge_lock);
+	if (current) {
 		char buf[32];
 		buf[0] = '\0';
 		DWORD size = sizeof(buf);
 		ctx->f->get_variable(r, KGL_VAR_SERVER_PROTOCOL, NULL, buf, &size);
 		if (strncmp(buf, kgl_expand_string("HTTP")) != 0) {
+			current->Release();
 			return KF_STATUS_REQ_FALSE;
 		}
-		create_waf_upstream(r, ctx, challenge);
+		bool registered = create_waf_upstream(r, ctx, current);
+		current->Release();
+		if (!registered) {
+			return KF_STATUS_REQ_FALSE;
+		}
 	}
 	return KF_STATUS_REQ_TRUE;
 }
