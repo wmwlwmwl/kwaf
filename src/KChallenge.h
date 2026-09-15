@@ -199,7 +199,16 @@ public:
 	}
 	bool shouldChallenge(const char *target)
 	{
-		if (request <= 0 || second <= 0 || target == NULL) {
+		if (target == NULL) {
+			return false;
+		}
+		// request=0,second=0 is the legacy "challenge immediately" mode.
+		// Positive values enable rate-based triggering; a mixed or negative
+		// pair is invalid and must not accidentally challenge every request.
+		if (request == 0 && second == 0) {
+			return true;
+		}
+		if (request <= 0 || second <= 0) {
 			return false;
 		}
 		time_t now = time(NULL);

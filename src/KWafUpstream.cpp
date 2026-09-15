@@ -5,6 +5,7 @@
 #include "ksocket.h"
 #include "KStringBuf.h"
 #include "kmd5.h"
+#include "klog.h"
 #include "KSequence.h"
 #include "KDsoAutoBuffer.h"
 #include <sstream>
@@ -138,6 +139,7 @@ KGL_RESULT KWafUpstream::check(KREQUEST r,kgl_async_context *ctx)
 	if (!challenge->shouldChallenge(rate_target.c_str())) {
 		return KGL_NEXT;
 	}
+	server_support->f->log(KLOG_WARNING, "may have cc attack, ip=[%s]\n", ips.c_str());
 	KStringBuf r_url;
 	KStringBuf id;
 	unsigned seq = sequence.getNext();
