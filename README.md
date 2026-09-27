@@ -34,3 +34,15 @@ cmake --build build --target install
 - `/vhs/kangle/ext/kwaf.dso.xml`
 
 最后重启或重载 Kangle，使扩展配置生效。升级 Kangle 后应使用对应版本的源码重新编译本扩展，避免内部接口不一致。
+
+## 图形验证码
+
+扩展内置四位数字图形验证码，请在 Kangle 请求控制中为路径 `/KANGLE_CCIMG.php` 添加 `anti_session` 标记规则。
+对应的请求控制链为：
+
+```xml
+<chain action="continue">
+  <acl module="path" path="/KANGLE_CCIMG.php"/>
+  <mark module="anti_session"/>
+</chain>
+```

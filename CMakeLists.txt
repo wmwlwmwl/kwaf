@@ -68,6 +68,7 @@ endif()
 list(APPEND KANGLE_INCLUDE_DIRS
     "${KANGLE_SOURCE_DIR}/include"
     "${KANGLE_SOURCE_DIR}/kasync/include"
+    "${KANGLE_SOURCE_DIR}/kasync/fcontext/src"
     "${KANGLE_SOURCE_DIR}/khttpd/include"
     "${KANGLE_SOURCE_DIR}/khttpd/davlib")
 
@@ -80,8 +81,10 @@ add_library(kwaf MODULE ${KWAF_SOURCE_FILES})
 set_target_properties(kwaf PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
 set_property(TARGET kwaf PROPERTY CXX_STANDARD 14)
 set_property(TARGET kwaf PROPERTY CXX_STANDARD_REQUIRED ON)
+find_package(ZLIB REQUIRED)
 target_include_directories(kwaf PRIVATE
     ${KANGLE_INCLUDE_DIRS})
+target_link_libraries(kwaf PRIVATE ${ZLIB_LIBRARIES})
 
 set(CMAKE_INSTALL_PREFIX "${KANGLE_DIR}" CACHE PATH "Install path prefix" FORCE)
 install(TARGETS kwaf

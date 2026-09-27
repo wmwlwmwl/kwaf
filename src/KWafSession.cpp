@@ -1,8 +1,42 @@
 #include "KWafSession.h"
 #include "KChallengeSession.h"
+#include "KCaptchaImage.h"
+#include "KAccessDsoSupport.h"
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
+#include <vector>
+
+static bool set_response_header(KREQUEST r, kgl_access_context *ctx,
+	const char *name, const char *value)
+{
+	return ctx->f->response_header(r, ctx->cn, name, (hlen_t)strlen(name),
+		value, (hlen_t)strlen(value)) == KGL_OK;
+}
+
+static uint32_t write_captcha_response(KREQUEST r, kgl_access_context *ctx,
+	uint16_t status, const char *content_type, const unsigned char *data, size_t size,
+	const char *location = NULL)
+{
+	char status_text[8];
+	snprintf(status_text, sizeof(status_text), "%u", (unsigned)status);
+	if (!set_response_header(r, ctx, "Status", status_text) ||
+		!set_response_header(r, ctx, "Content-Type", content_type) ||
+		!set_response_header(r, ctx, "Cache-Control", "no-cache, no-store, must-revalidate") ||
+		!set_response_header(r, ctx, "Pragma", "no-cache") ||
+		!set_response_header(r, ctx, "X-Content-Type-Options", "nosniff")) {
+		return KF_STATUS_REQ_FALSE;
+	}
+	if (location && !set_response_header(r, ctx, "Location", location)) {
+		return KF_STATUS_REQ_FALSE;
+	}
+	KAccessContext *access_context = (KAccessContext *)ctx->cn;
+	KAutoBuffer *buffer = access_context->GetBuffer((KHttpRequest *)r);
+	if (size > 0 && buffer->write_all((const char *)data, (int)size) != KGL_OK) {
+		return KF_STATUS_REQ_FALSE;
+	}
+	return KF_STATUS_REQ_TRUE | KF_STATUS_REQ_FINISHED;
+}
 
 // Returns 1 for a valid value, 0 when absent, and -1 when malformed.
 static int get_int_param(const char *query, const char *name, int *value)
@@ -44,27 +78,35 @@ uint32_t KWafSession::process(KREQUEST r, kgl_access_context *ctx, DWORD notify)
 		return KF_STATUS_REQ_FALSE;
 	}
 	if (value_result == 0) {
-		//get security number
-		int number = anticc_session_number(key);
-		if (number == -1) {
+		int number = 0;
+		uint32_t image_seed = 0;
+		if (!anticc_session_image(key, &number, &image_seed)) {
 			return KF_STATUS_REQ_FALSE;
 		}
-		memset(param, 0, sizeof(param));
-		snprintf(param, 16, "v=%d", number);
-		ctx->f->support_function(r, ctx->cn, KD_REQ_REWRITE_PARAM, param, NULL);
-		return KF_STATUS_REQ_TRUE;
+		std::vector<unsigned char> image;
+		if (!build_captcha_png(number, image_seed, image)) {
+			return KF_STATUS_REQ_FALSE;
+		}
+		return write_captcha_response(r, ctx, 200, "image/png", image.data(), image.size());
 	}
-	int secury_num = -1;
-	char *url = anticc_session_verify(key, secury_num);
-	if (url == NULL) {
+	char *url = NULL;
+	anticc_session_verify_result verify_result = anticc_session_verify(key, val, &url);
+	if (verify_result == ANTICC_SESSION_NOT_FOUND) {
 		return KF_STATUS_REQ_FALSE;
 	}
-	char *p = strchr(url, '?');
-	if (p) {
-		if (secury_num == val) {
-			ctx->f->support_function(r, ctx->cn, KD_REQ_REWRITE_URL, url, NULL);
+	if (verify_result == ANTICC_SESSION_VERIFIED) {
+		if (url == NULL || url[0] != '/' || strpbrk(url, "\r\n") != NULL) {
+			free(url);
+			return KF_STATUS_REQ_FALSE;
 		}
+		static const unsigned char redirect_body[] = "Redirecting";
+		uint32_t result = write_captcha_response(r, ctx, 302, "text/plain; charset=utf-8",
+			redirect_body, sizeof(redirect_body) - 1, url);
+		free(url);
+		return result;
 	}
-	free(url);
+	// Keep the legacy behavior for an incorrect answer. Returning false lets
+	// the vhost anti_cc rule render its configured challenge page and create a
+	// fresh session instead of replacing it with an extension-owned error page.
 	return KF_STATUS_REQ_FALSE;
 }
