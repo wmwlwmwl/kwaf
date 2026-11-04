@@ -16,8 +16,10 @@ set(KWAF_KANGLE_SOURCES
     "${KANGLE_SOURCE_DIR}/khttpd/src/KHttpHeader.cpp"
     "${KANGLE_SOURCE_DIR}/khttpd/src/KHttpLib.cpp"
     "${KANGLE_SOURCE_DIR}/khttpd/src/KStream.cpp"
+    "${KANGLE_SOURCE_DIR}/khttpd/src/KAutoBuffer.cpp"
     "${KANGLE_SOURCE_DIR}/khttpd/src/KStringBuf.cpp"
     "${KANGLE_SOURCE_DIR}/src/KSequence.cpp"
+    "${KANGLE_SOURCE_DIR}/src/KTargetRate.cpp"
     "${KANGLE_SOURCE_DIR}/src/kmd5.cpp"
     "${KANGLE_SOURCE_DIR}/kasync/src/krbtree.c"
     "${KANGLE_SOURCE_DIR}/kasync/src/kmalloc.c")
@@ -84,7 +86,7 @@ set_property(TARGET kwaf PROPERTY CXX_STANDARD_REQUIRED ON)
 find_package(ZLIB REQUIRED)
 target_include_directories(kwaf PRIVATE
     ${KANGLE_INCLUDE_DIRS})
-target_link_libraries(kwaf PRIVATE ${ZLIB_LIBRARIES})
+target_link_libraries(kwaf PRIVATE ZLIB::ZLIB)
 
 set(CMAKE_INSTALL_PREFIX "${KANGLE_DIR}" CACHE PATH "Install path prefix" FORCE)
 install(TARGETS kwaf
